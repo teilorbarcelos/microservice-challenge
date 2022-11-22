@@ -1,34 +1,32 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Logger } from '@nestjs/common';
+import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
+import { Play } from './interfaces/play.interface';
 import { PlaysService } from './plays.service';
-import { CreatePlayDto } from './dto/create-play.dto';
-import { UpdatePlayDto } from './dto/update-play.dto';
+
+const ackErrors: string[] = ['E11000'];
 
 @Controller('plays')
 export class PlaysController {
   constructor(private readonly playsService: PlaysService) {}
 
-  @Post()
-  create(@Body() createPlayDto: CreatePlayDto) {
-    return this.playsService.create(createPlayDto);
-  }
+  private readonly logger = new Logger(PlaysController.name);
 
-  @Get()
-  findAll() {
-    return this.playsService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.playsService.findOne(+id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updatePlayDto: UpdatePlayDto) {
-    return this.playsService.update(+id, updatePlayDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.playsService.remove(+id);
+  @EventPattern('create-play')
+  async createPlay(@Payload() play: Play, @Ctx() context: RmqContext) {
+    const channel = context.getChannelRef();
+    const originalMsg = context.getMessage();
+    try {
+      this.logger.log(`play: ${JSON.stringify(play)}`);
+      await this.playsService.createPlay(play);
+      await channel.ack(originalMsg);
+    } catch (error) {
+      this.logger.log(`error: ${JSON.stringify(error.message)}`);
+      const filterAckError = ackErrors.filter((ackError) =>
+        error.message.includes(ackError),
+      );
+      if (filterAckError.length > 0) {
+        await channel.ack(originalMsg);
+      }
+    }
   }
 }
