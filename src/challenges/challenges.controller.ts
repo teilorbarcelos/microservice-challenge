@@ -69,12 +69,12 @@ export class ChallengesController {
     const channel = context.getChannelRef();
     const originalMsg = context.getMessage();
     try {
-      const { categoryId, dataRef } = payload;
+      const { categoryId, dateRef } = payload;
       this.logger.log(`data: ${JSON.stringify(payload)}`);
-      if (dataRef) {
+      if (dateRef) {
         return await this.challengesService.getDoneChallengesByDate(
           categoryId,
-          dataRef,
+          dateRef,
         );
       } else {
         return await this.challengesService.getDoneChallenges(categoryId);
